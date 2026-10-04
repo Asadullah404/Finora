@@ -1,0 +1,158 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidTransaction(data) {
+      return data.id is string && isValidId(data.id) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             (data.type == 'income' || data.type == 'expense') &&
+             data.amountMinorUnits is int && data.amountMinorUnits >= 0 &&
+             data.currencyCode is string && data.currencyCode.size() >= 3 && data.currencyCode.size() <= 5 &&
+             data.categoryId is string && isValidId(data.categoryId) &&
+             data.categoryNameSnapshot is string && data.categoryNameSnapshot.size() <= 100 &&
+             data.transactionDate is string && data.transactionDate.size() <= 20 &&
+             data.transactionYearMonth is string && data.transactionYearMonth.size() <= 10 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 500)) &&
+             (!('paymentMethod' in data) || (data.paymentMethod is string && data.paymentMethod.size() <= 100)) &&
+             (!('merchant' in data) || (data.merchant is string && data.merchant.size() <= 100)) &&
+             (!('tags' in data) || (data.tags is list && data.tags.size() <= 10)) &&
+             (!('isRecurring' in data) || data.isRecurring is bool) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidCategory(data) {
+      return data.id is string && isValidId(data.id) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.icon is string && data.icon.size() <= 50 &&
+             data.colorHex is string && data.colorHex.size() <= 20 &&
+             (data.type == 'income' || data.type == 'expense' || data.type == 'both') &&
+             (!('isDefault' in data) || data.isDefault is bool) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidBudget(data) {
+      return data.id is string && isValidId(data.id) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.month is string && data.month.size() <= 10 &&
+             data.overallLimitMinorUnits is int && data.overallLimitMinorUnits >= 0 &&
+             (!('savingsTargetMinorUnits' in data) || (data.savingsTargetMinorUnits is int && data.savingsTargetMinorUnits >= 0)) &&
+             (!('categoryLimits' in data) || data.categoryLimits is map) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+             data.currencyCode is string && data.currencyCode.size() >= 3 && data.currencyCode.size() <= 5 &&
+             data.openingBalanceMinorUnits is int &&
+             (!('firstDayOfWeek' in data) || (data.firstDayOfWeek is int && data.firstDayOfWeek >= 1 && data.firstDayOfWeek <= 7)) &&
+             (!('hideBalance' in data) || data.hideBalance is bool) &&
+             (!('budgetWarningPercent' in data) || (data.budgetWarningPercent is int && data.budgetWarningPercent >= 0 && data.budgetWarningPercent <= 100)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId} {
+      allow get, list, create, update, delete: if isSignedIn() && request.auth.uid == userId;
+
+      match /transactions/{transactionId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == userId &&
+                         isValidId(transactionId) &&
+                         isValidTransaction(incoming());
+        allow update: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTransaction(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'amountMinorUnits', 'type', 'categoryId', 'categoryNameSnapshot',
+                           'transactionDate', 'transactionYearMonth', 'description',
+                           'paymentMethod', 'merchant', 'tags', 'isRecurring', 'currencyCode', 'updatedAt'
+                         ]);
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      match /categories/{categoryId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == userId &&
+                         isValidId(categoryId) &&
+                         isValidCategory(incoming());
+        allow update: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidCategory(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'name', 'icon', 'colorHex', 'type', 'isDefault', 'updatedAt'
+                         ]);
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      match /budgets/{budgetId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == userId &&
+                         isValidId(budgetId) &&
+                         isValidBudget(incoming());
+        allow update: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidBudget(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'overallLimitMinorUnits', 'categoryLimits', 'savingsTargetMinorUnits', 'month', 'updatedAt'
+                         ]);
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      match /settings/{settingId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == userId &&
+                         isValidId(settingId) &&
+                         isValidUserProfile(incoming());
+        allow update: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidUserProfile(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'currencyCode', 'openingBalanceMinorUnits', 'firstDayOfWeek',
+                           'hideBalance', 'budgetWarningPercent', 'updatedAt'
+                         ]);
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+  }
+}

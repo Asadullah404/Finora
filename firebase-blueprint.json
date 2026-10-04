@@ -1,0 +1,95 @@
+{
+  "entities": {
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Represents an individual financial transaction (income or expense).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique transaction identifier" },
+        "userId": { "type": "string", "description": "User identifier matching auth.uid" },
+        "type": { "type": "string", "enum": ["income", "expense"], "description": "Transaction type" },
+        "amountMinorUnits": { "type": "integer", "description": "Transaction amount in integer minor currency units (e.g. paisa/cents)" },
+        "currencyCode": { "type": "string", "description": "Currency code (e.g. PKR, USD)" },
+        "categoryId": { "type": "string", "description": "Category identifier" },
+        "categoryNameSnapshot": { "type": "string", "description": "Category name snapshot at time of transaction" },
+        "transactionDate": { "type": "string", "description": "Calendar date string YYYY-MM-DD" },
+        "transactionYearMonth": { "type": "string", "description": "Year-Month string YYYY-MM" },
+        "description": { "type": "string", "description": "Notes or details" },
+        "paymentMethod": { "type": "string", "description": "Payment method (e.g. Cash, Bank, Card)" },
+        "merchant": { "type": "string", "description": "Optional merchant or payee" },
+        "tags": { "type": "array", "description": "Optional list of tags" },
+        "isRecurring": { "type": "boolean", "description": "Whether this transaction is recurring" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp via serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp via serverTimestamp()" }
+      },
+      "required": ["id", "userId", "type", "amountMinorUnits", "currencyCode", "categoryId", "categoryNameSnapshot", "transactionDate", "transactionYearMonth", "createdAt", "updatedAt"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Financial category for grouping transactions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Category identifier" },
+        "userId": { "type": "string", "description": "User identifier matching auth.uid" },
+        "name": { "type": "string", "description": "Category name" },
+        "icon": { "type": "string", "description": "Icon key name" },
+        "colorHex": { "type": "string", "description": "Color hex code" },
+        "type": { "type": "string", "enum": ["income", "expense", "both"], "description": "Category applies to income or expense" },
+        "isDefault": { "type": "boolean", "description": "System or user created default" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["id", "userId", "name", "icon", "colorHex", "type", "createdAt", "updatedAt"]
+    },
+    "Budget": {
+      "title": "Budget",
+      "description": "Monthly budget settings and category allocations.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Budget document identifier" },
+        "userId": { "type": "string", "description": "User identifier matching auth.uid" },
+        "month": { "type": "string", "description": "Target month in YYYY-MM format" },
+        "overallLimitMinorUnits": { "type": "integer", "description": "Overall monthly spending limit in minor units" },
+        "categoryLimits": { "type": "object", "description": "Map of categoryId to limit amount in minor units" },
+        "savingsTargetMinorUnits": { "type": "integer", "description": "Target monthly savings goal" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["id", "userId", "month", "overallLimitMinorUnits", "createdAt", "updatedAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User preferences, default currency, and starting balance.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User identifier matching auth.uid" },
+        "currencyCode": { "type": "string", "description": "Preferred primary currency (e.g. PKR)" },
+        "openingBalanceMinorUnits": { "type": "integer", "description": "Opening balance in minor units" },
+        "firstDayOfWeek": { "type": "integer", "description": "1 = Sunday, 2 = Monday" },
+        "hideBalance": { "type": "boolean", "description": "Whether balance privacy mode is active" },
+        "budgetWarningPercent": { "type": "integer", "description": "Warning threshold percentage (e.g. 80)" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["userId", "currencyCode", "openingBalanceMinorUnits", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Financial transactions belonging to the user."
+    },
+    "/users/{userId}/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Custom and standard categories belonging to the user."
+    },
+    "/users/{userId}/budgets/{budgetId}": {
+      "schema": "Budget",
+      "description": "Monthly budget specifications."
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": "UserProfile",
+      "description": "User preferences and profile configuration."
+    }
+  }
+}
